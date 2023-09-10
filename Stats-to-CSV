@@ -1,0 +1,63 @@
+import requests
+from bs4 import BeautifulSoup
+import csv
+
+#Change name from input to url format
+def change_name(name):
+    parts = name.lower().split()
+    base_name = parts[1][:5] + parts[0][:2]
+    index = 1
+    while True:
+        new_name = base_name + str(index).zfill(2)
+        url = f"https://www.basketball-reference.com/players/{new_name[0]}/{new_name}/splits/2023"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        # Assuming the website uses h1 tag to show player name.
+        name_on_website = soup.find("h1").text.lower()
+        if name.lower() in name_on_website:
+            return new_name
+        index += 1
+
+#gets player stats from url
+def get_player_stats(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    rows = soup.find_all('tr')
+    categories = ['Total']#, 'Home', 'Road', 'Pre', 'Post', 'Win', 'Loss'#]
+    stats = {category: {} for category in categories}
+    for row in rows:
+        tds = row.find_all('td')
+        if not tds:
+            continue
+        data = [td.text for td in tds]
+        category = data[0]
+        if category in categories:
+            fg_pct, three_pt_pct, ft_pct, mp, pts, reb, ast = data[19], data[20], data[21], data[29], data[30], data[31], data[32]
+            stats[category] = {
+                'FG%': fg_pct,
+                '3P%': three_pt_pct,
+                'FT%': ft_pct,
+                'MP': mp,
+                'PTS': pts,
+                'REB': reb,
+                'AST': ast
+            }
+    return stats
+
+#write stats to csv file
+def write_to_csv(stats, filename):
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Category', 'FG%', '3P%', 'FT%', 'MP', 'PTS', 'REB', 'AST'])
+        for category, values in stats.items():
+            writer.writerow([category] + list(values.values()))
+
+name = input('Input Name: ')
+year = input('year: ')
+
+player_name = change_name(name)
+
+url_template = f'https://www.basketball-reference.com/players/{player_name[0]}/{player_name}/splits/{year}'
+
+stats = get_player_stats(url_template)
+write_to_csv(stats, f'{name}_{year}.csv')
