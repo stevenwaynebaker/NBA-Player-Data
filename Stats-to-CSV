@@ -1,24 +1,37 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
+import re
 
-#Change name from input to url format
+# changes name from input to url format
 def change_name(name):
+    
+    # Remove special characters and spaces
+    name = re.sub(r'[^a-zA-Z0-9\s]', '', name)
+    
+    # Split the name into parts, make it lowercase, and extract a shortened version
     parts = name.lower().split()
     base_name = parts[1][:5] + parts[0][:2]
     index = 1
     while True:
+        # Generate a new name with an index
         new_name = base_name + str(index).zfill(2)
-        url = f"https://www.basketball-reference.com/players/{new_name[0]}/{new_name}/splits/2023"
+        
+        # Create a URL based on the new name and year
+        url = f"https://www.basketball-reference.com/players/{new_name[0]}/{new_name}/splits/{year}"
         response = requests.get(url)
         soup = BeautifulSoup(response.content, 'html.parser')
-        # Assuming the website uses h1 tag to show player name.
+        
+        # Extract the player's name from the website and normalize it
         name_on_website = soup.find("h1").text.lower()
+        name_on_website = re.sub(r'[^a-zA-Z0-9\s]', '', name_on_website)
+        
+        # Check if the input name matches the name on the website
         if name.lower() in name_on_website:
             return new_name
         index += 1
 
-#gets player stats from url
+# Retrieves player stats from URL
 def get_player_stats(url):
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
@@ -44,20 +57,33 @@ def get_player_stats(url):
             }
     return stats
 
-#write stats to csv file
+# write stats to csv file
 def write_to_csv(stats, filename):
     with open(filename, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Category', 'FG%', '3P%', 'FT%', 'MP', 'PTS', 'REB', 'AST'])
         for category, values in stats.items():
             writer.writerow([category] + list(values.values()))
+            
+# Collect stats for a specified number of players
+num = int(input('How many Players would you like to compare?'))
+n = 0
+stats = {}
+        
+while n < num:
+    
+    name = input(f'Input Player {n + 1}: ')
+    year = input('Year: ')
 
-name = input('Input Name: ')
-year = input('year: ')
+    player_name = change_name(name)
 
-player_name = change_name(name)
+    url_template = f'https://www.basketball-reference.com/players/{player_name[0]}/{player_name}/splits/{year}'
+    
+    stats[n + 1] = get_player_stats(url_template)  
+    n = n + 1
+    
+# Print the collected stats
+# for x in stats:
+#    print(stats[x])
 
-url_template = f'https://www.basketball-reference.com/players/{player_name[0]}/{player_name}/splits/{year}'
-
-stats = get_player_stats(url_template)
 write_to_csv(stats, f'{name}_{year}.csv')
